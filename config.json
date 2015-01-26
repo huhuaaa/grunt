@@ -1,0 +1,20 @@
+{
+  "root":"code/", 
+  "src":"", 
+  "needRegExp":"js/pages", 
+  "voidRegExp":"", 
+  "baseUrl":"static/js/", 
+  "paths":{
+    "template":"amd/template",
+    "jquery":"amd/jquery",
+    "underscore":"amd/underscore",
+    "backbone":"amd/backbone",
+    "zepto":"amd/zepto",
+    "helper":"lib/helper"
+  }, 
+  "dest":"build/",
+  "min":false,
+  "less":true,
+  "lessSrc":"css/",
+  "lessRegExp":"test"
+}
