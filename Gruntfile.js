@@ -1,9 +1,325 @@
-module.exports=function(h){var p=require("path"),q=require("fs"),g=h.file.readJSON("config.json"),n=function(a){this.fs=q;this.path=p;var c=(__dirname+"/").replace(/\\/g,"/");this.rootpath=c+(a.root||"");this.needDir=this.rootpath+(a.src||"");this.regExp=new RegExp(a.needRegExp||"");this.voidRegExp=a.voidRegExp?new RegExp(a.voidRegExp):null;this.files={};this.defined={};this.destpath=c+a.dest;this.rootpathReg=new RegExp("^"+this.rootpath);this.concatFiles={};this.staticFiles={};this.paths=a.paths||
-{};this.baseUrl=a.baseUrl||"";this.min=a.min||!1;this.less=a.less||!1;this.lessFiles={};this.lessRegExp=new RegExp(a.lessRegExp||"");this.lessDir=this.rootpath+(a.lessSrc||"")};n.prototype={readdir:function(a){if(this.fs.existsSync(a)){var c=this.fs.readdirSync(a),d;for(d in c){var b=a.match(/\/$/)?a+c[d]:a+"/"+c[d],e=this.fs.statSync(b);if(e.isFile()&&b.match(this.regExp)&&(!this.voidRegExp||!b.match(this.voidRegExp))){var g=b.replace(this.rootpathReg,"");this.files[g]=this.fs.readFileSync(b,{encoding:"utf8"})}e.isDirectory()&&
-this.readdir(b)}}},"do":function(){this.readdir(this.needDir);this.compile()},compile:function(){for(var a in this.files){var c=this.destpath+a,d=this.path.dirname(c);this.fs.existsSync(d)||this.mkdir(d,511);var d=this.files[a].match(/require\s*\(\s*\[[^\])]*\]/g),b;for(b in d){var e=d[b].replace(/require\s*\(\s*\[|[\'\"\s\]]/g,"").split(",");this.analyzeConcat(c,e)}this.concatFiles[c].push(this.rootpath+a)}},analyzeConcat:function(a,c){if(""!=a){"undefined"==typeof this.concatFiles[a]&&(this.concatFiles[a]=
-[]);for(var d in c){var b="",b="undefined"!=typeof this.paths[c[d]]?b+(this.rootpath+this.baseUrl+this.paths[c[d]]):b+(this.rootpath+this.baseUrl+c[d]);this.fs.existsSync(b+".js")?b+=".js":this.fs.existsSync(b+"/index.js")&&(b+="/index.js");this.fs.existsSync(b)&&-1==this.concatFiles[a].toString().indexOf(b)&&(this.concatFiles[a].push(b),b=this.staticFile(b),0<b.length&&this.analyzeConcat(a,b))}}},staticFile:function(a,c){if(this.fs.existsSync(a)&&"undefined"==typeof this.staticFiles[a]){this.staticFiles[a]=
-[];var d=this.fs.readFileSync(a,{encoding:"utf8"}).match(/define\s*\(\s*\[[^\])]*\]/g),b;for(b in d){var e=d[b].replace(/define\s*\(\s*\[|[\'\"\s\]]/g,"").split(","),g=this.staticFiles[a],k=void 0;for(k in e)g.push(e[k])}}return this.staticFiles[a]},mkdir:function(a,c){var d=this.path.dirname(a);this.fs.existsSync(a)||this.mkdir(d,c);this.fs.existsSync(a)||this.fs.mkdirSync(a,c)},getConcatFiles:function(){if(this.min){var a={},c;for(c in this.concatFiles)a[c.replace(/\.js$/g,".min.js")]=this.concatFiles[c];
-return a}return this.concatFiles},readdirLess:function(a){var c=this.fs.readdirSync(a),d;for(d in c){var b=a.match(/\/$/)?a+c[d]:a+"/"+c[d],e=this.fs.statSync(b);e.isFile()&&b.match(this.lessDir)&&(this.lessFiles[b.replace(this.rootpathReg,this.destpath).replace(".less",".css")]=b);e.isDirectory()&&this.readdirLess(b)}},getLessFiles:function(){this.less&&this.readdirLess(this.lessDir);return this.lessFiles}};var l=new n(g);l["do"]();var n=l.getConcatFiles(),l=l.getLessFiles(),m=[];h.initConfig({concat:{options:{separator:"",
-process:function(a,c){var d=a,b=p.basename(c,".js");if(g.paths&&"undefined"==typeof g.paths[b])var e=new RegExp((__dirname+"/"+g.root+g.baseUrl).replace(/\\/g,"/")+"|.js","g"),b=c.replace(e,"");var h=d.match(/__template__\s*\([^\)]*\)/g),k;for(k in h)if("undefined"==typeof m[k]){var f=h[k].replace(/__template__\s*\(\s*[\'\"]?|[\'\"]\)$/g,""),e=new RegExp(h[k].replace(/\(/g,"\\(").replace(/\)/g,"\\)"),"g"),f=p.join(__dirname,g.root,f);"undefined"==typeof m[f]&&q.existsSync(f)&&(m[f]=q.readFileSync(f,
-{encoding:"utf8"}));if("undefined"!=typeof m[f])var l=h[k].replace(/\)/g,""),f=m[f].replace(/\'/g,"\\'"),f=f.replace(/[\n\r]/g,""),f=l+",'"+f+"')",d=d.replace(e,f)}return d.replace(/define\s*\(\s*\[/g,'define("'+b+'",[')}},bar:{files:n}},uglify:{options:{banner:'/*! <%= grunt.template.today("yyyy-mm-dd") %> */\n'},build:{files:[{expand:!0,cwd:g.dest,src:"**/*.js",dest:g.dest}]}},less:{development:{options:{compress:!0,ieCompat:!0,relativeUrls:!1,customFunctions:{}},files:l}}});h.loadNpmTasks("grunt-contrib-concat");
-h.loadNpmTasks("grunt-contrib-uglify");h.loadNpmTasks("grunt-contrib-less");h.registerTask("default",["concat","uglify","less"])};
+module.exports = function(grunt) {
+  //nodejs path 库函数
+  var lib_path = require('path');
+  var lib_fs = require('fs');
+
+  //数组推入数组
+  var array_push = function(array,data){
+    for(var i in data){
+      array.push(data[i]);
+    }
+  }
+  //搜索数组
+  var array_search = function(array,key){
+    return array.toString().indexOf(key) != -1;
+  };
+
+  var config = grunt.file.readJSON('config.json');
+  /*var config = {
+    root:'code/', //项目根目录
+    src:'', //需要处理的资源文件夹，相对于项目根目录
+    needRegExp:'js/pages', //需要处理的js正则表达式
+    voidRegExp:'', //不需要处理的js正则表达式
+    //voidModule:[], //不需要处理的模块
+    baseUrl:'js/', //模块根目录
+    paths:{
+      'template':'amd/template',
+      'jquery':'amd/jquery',
+      'underscore':'amd/underscore',
+      'backbone':'amd/backbone',
+      'zepto':'amd/zepto',
+      'helper':'lib/helper'
+    }, //模块指定路径
+    dest:'build/', //目标文件夹
+    less: true, //是否开启less编译功能
+    lessSrc: '', //less相对目录
+    lessRegExp: '' //less文件需要的正则表达式
+  };*/
+
+  var handle = function(config){
+    this.fs = lib_fs;
+    this.path = lib_path;
+    var dir = (__dirname + '/').replace(/\\/g,'/'); //统一路径的\\为/
+    this.rootpath = dir + (config.root || '');
+    this.needDir = this.rootpath + (config.src || '');
+    this.regExp = new RegExp(config.needRegExp || '');
+    this.voidRegExp = config.voidRegExp ? new RegExp(config.voidRegExp) : null;
+    this.files = {}; //需要处理的js
+    this.defined = {}; //已经加载的模块
+    this.destpath = dir + config.dest; //构建的目标目录
+    this.rootpathReg = new RegExp('^' + this.rootpath); //根目录正则表达式
+    this.concatFiles = {}; //需要合并的文件数组
+    this.staticFiles = {}; //读取并处理过的文件
+    this.paths = config.paths || {};
+    this.baseUrl = config.baseUrl || '';
+    this.min = config.min || false; //输出文件是否添加.min，默认true
+
+    this.less = config.less || false; //是否开启less编译功能
+    this.lessFiles = {}; //需要编译的less文件
+    this.lessRegExp = new RegExp(config.lessRegExp || ''); //需要满足的less文件正则规则
+    this.lessDir = this.rootpath + (config.lessSrc || '');
+  };
+  handle.prototype = {
+    //读取文件夹内符合要求的文件
+    readdir : function(dir){
+      if(this.fs.existsSync(dir)){
+        var array = this.fs.readdirSync(dir);
+        for(var i in array){
+          var path = dir.match(/\/$/) ? (dir + array[i]) : (dir + '/' + array[i]);
+          var stats = this.fs.statSync(path);
+          if(stats.isFile()){
+            if(path.match(this.regExp) && (!this.voidRegExp || !path.match(this.voidRegExp))){
+              var key = path.replace(this.rootpathReg,'');
+              //fs.readFileSync 添加第二参数并且指定格式返回字符串，否则返回buffer
+              this.files[key] = this.fs.readFileSync(path,{encoding:'utf8'});
+            }
+          }
+          if(stats.isDirectory()){
+            this.readdir(path);
+          }
+        }
+      }
+    },
+    do:function(){
+      //读取需要编译的js文件
+      this.readdir(this.needDir);
+      //对需要编译的文件进行处理
+      this.compile();
+    },
+    //编译文件
+    compile:function(){
+      for(var i in this.files){
+        var filepath = this.destpath + i;
+        var dir = this.path.dirname(filepath);
+        //文件夹不存在，创建文件夹
+        if(!this.fs.existsSync(dir)){
+          this.mkdir(dir, 0777);
+        }
+        var filedata = this.files[i];
+        //var matchs = filedata.match(/define\s*\(\s*\[[^\])]*\]/g);
+        var matchs = filedata.match(/require\s*\(\s*\[[^\])]*\]/g);
+        for(var j in matchs){
+            var modules = matchs[j].replace(/require\s*\(\s*\[|[\'\"\s\]]/g,'').split(',');
+            this.analyzeConcat(filepath,modules);
+        }
+        this.concatFiles[filepath].push(this.rootpath + i);
+        //this.analyzeConcat(filepath,[this.rootpath + i]);
+        //this.fs.writeFileSync(filepath, this.files[i], {encoding:'utf8'});
+        //异步没写文件
+        /*this.fs.writeFileSync(filepath, this.files[i], {encoding:'utf8'}, function(err){
+          if (err) throw err;
+          console.log('saved!');
+        });*/
+      }
+    },
+    analyzeConcat:function(filepath,modules){
+      if(filepath == '') return;
+      if(typeof this.concatFiles[filepath] == 'undefined') this.concatFiles[filepath] = [];
+      for(var i in modules){
+        var path = '';
+        if(typeof this.paths[modules[i]] != 'undefined'){
+          path += this.rootpath + this.baseUrl + this.paths[modules[i]];
+        }else{
+          path += this.rootpath + this.baseUrl + modules[i];
+        }
+        //console.log(path);
+        if(this.fs.existsSync(path + '.js')){
+          path += '.js';
+        }
+        else if(this.fs.existsSync(path + '/index.js')){
+          path += '/index.js';
+        }
+        if(this.fs.existsSync(path) && !array_search(this.concatFiles[filepath],path)){
+          this.concatFiles[filepath].push(path);
+          //查找文件内部是否还有依赖
+          var getInner = this.staticFile(path);
+          if(getInner.length > 0){
+            this.analyzeConcat(filepath,getInner);
+          }
+        }
+      }
+      //console.log(this.concatFiles[filepath]);
+    },
+    //获取依赖关系，并存储如staticFiles数组重复利用
+    staticFile:function(filepath,hadfiles){
+      if(this.fs.existsSync(filepath) && typeof this.staticFiles[filepath] == 'undefined'){
+        this.staticFiles[filepath] = [];
+        var filedata = this.fs.readFileSync(filepath,{encoding:'utf8'});
+        var matchs = filedata.match(/define\s*\(\s*\[[^\])]*\]/g);
+        for(var j in matchs){
+          var modules = matchs[j].replace(/define\s*\(\s*\[|[\'\"\s\]]/g,'').split(',');
+          array_push(this.staticFiles[filepath],modules);
+        }
+      }
+      return this.staticFiles[filepath];
+    },
+    //循环创建文件夹
+    mkdir:function(dir, mode){
+      var d = this.path.dirname(dir);
+      //创建父目录
+      if(!this.fs.existsSync(dir)){
+        this.mkdir(d, mode);
+      }
+      //文件夹不存在，创建文件夹
+      if(!this.fs.existsSync(dir)){
+        this.fs.mkdirSync(dir, mode);
+      }
+    },
+    //获取需要合并文件的配置数组
+    getConcatFiles:function(){
+      if(this.min){
+        var result = {};
+        for(var i in this.concatFiles){
+          result[i.replace(/\.js$/g,'.min.js')] = this.concatFiles[i];
+        }
+        return result;
+      }else{
+        return this.concatFiles;
+      }
+    },
+    //读取需要编译的less文件
+    readdirLess:function(dir){
+        //存在文件夹才读取
+        if(this.fs.existsSync(dir)){
+            var array = this.fs.readdirSync(dir);
+            for(var i in array){
+              var path = dir.match(/\/$/) ? (dir + array[i]) : (dir + '/' + array[i]);
+              var stats = this.fs.statSync(path);
+              if(stats.isFile()){
+                if(path.match(this.lessDir)){
+                  this.lessFiles[path.replace(this.rootpathReg, this.destpath).replace('.less', '.css')] = path;
+                }
+              }
+              if(stats.isDirectory()){
+                this.readdirLess(path);
+              }
+            }
+        }
+    },
+    //获取需要编译的less文件
+    getLessFiles:function(){
+      if(this.less){
+        this.readdirLess(this.lessDir);
+      }
+      return this.lessFiles;
+    }
+  };
+
+  //执行解析
+  var my_handle = new handle(config);
+  my_handle.do();
+  //待合并文件
+  var concatFiles = my_handle.getConcatFiles();
+  //需要处理的less文件
+  var lessFiles = my_handle.getLessFiles();
+  //console.log(concatFiles);return;
+  var __templates = [];
+  //var concatFiles = {'build/js/pages/index.js':['code/js/amd/backbone.js','code/js/amd/zepto.js']};
+
+  // Project configuration.
+  grunt.initConfig({
+    //文件合并配置
+    concat:{
+      options:{
+        //定义一个用于插入合并输出文件直接的字符
+        separator:'',
+        //读取文件时处理
+        process:function(src, filepath){
+            var result = src;
+            var module = lib_path.basename(filepath,'.js');
+            if(config.paths && typeof config.paths[module] == 'undefined'){
+                var reg = new RegExp((__dirname + '/' + config.root + config.baseUrl).replace(/\\/g,'/') + '|.js','g'); 
+                module = filepath.replace(reg,'');
+                //console.log(module);
+            }
+            return result.replace(/define\s*\(\s*\[/g,'define("'+module+'",[');
+        }
+      },
+      bar:{
+        files:concatFiles
+      }
+    },
+    //文件压缩配置
+    uglify: {
+      options: {
+        banner: '/*! <%= grunt.template.today("yyyy-mm-dd") %> */\n'
+      },
+      build: {
+        //多文件方式
+        files:[{
+          expand: true,cwd: config.dest,src: '**/*.js', dest: config.dest
+        }]
+      }
+    },
+    //less配置
+    less: {
+      development:{
+        options:{
+          //rootpath: __dirname + '/' + config.root,
+          //paths:[''],
+          compress: true, //去除空格
+          ieCompat: true, //兼容ie8
+          relativeUrls: false, //是否使用相对路径
+          customFunctions: {} //自定义方法
+        },
+        files:lessFiles //样式文件
+      }
+    }
+  });
+  
+  //解析模版的方法
+  var myParseTemplate = function(result){
+      var template_htmls = [];
+      var templates = result.match(/__template__\s*\([^\)]*\)/g);
+      for(var i in templates){
+        if(typeof __templates[i] == 'undefined'){
+          var tplpath = templates[i].replace(/__template__\s*\(\s*[\'\"]?|[\'\"]\)$/g,'');
+          tplpath = lib_path.join(__dirname,config.root,tplpath);
+          if(typeof __templates[tplpath] == 'undefined' && lib_fs.existsSync(tplpath)){
+            __templates[tplpath] = lib_fs.readFileSync(tplpath,{encoding:'utf8'});
+          }
+          if(typeof __templates[tplpath] != 'undefined'){
+            var front = templates[i].replace(/\)/g,'');
+            var html = __templates[tplpath].replace(/\'/g,'\\\'');
+            html = html.replace(/[\n\r]/g,'');
+            html = front + ',\'' + html + '\')';
+            template_htmls.push(html);
+          }
+        }
+      }
+      if(template_htmls.length > 0){
+          var html = '\n\rrequire([\'template\'], function(){';
+          for(var i in template_htmls){
+              html += template_htmls[i] + ';';
+          }
+          result = html + '});\n\r' + result;
+      }
+      return result;
+  }
+  
+  //注册模版解析任务
+  grunt.registerTask('tpl', function(){
+      for(var i in concatFiles){
+          var filepath = i;
+          if(lib_fs.existsSync(filepath)){
+              console.log('File ' + filepath);
+              var src = lib_fs.readFileSync(filepath, {encoding: 'utf8'});
+              src = myParseTemplate(src, filepath); //解析需要的模版
+              lib_fs.writeFileSync(filepath, src);
+          }
+      }
+  });
+
+  //加载包含 “concat” 任务的插件
+  grunt.loadNpmTasks('grunt-contrib-concat');
+ 
+  //加载包含 "uglify" 任务的插件。
+  grunt.loadNpmTasks('grunt-contrib-uglify');
+
+  //加载less插件
+  grunt.loadNpmTasks('grunt-contrib-less');
+
+  //执行任务
+  grunt.registerTask('default', ['concat','tpl','uglify','less']);
+
+};

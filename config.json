@@ -15,6 +15,6 @@
   "dest":"build/",
   "min":false,
   "less":true,
-  "lessSrc":"css/",
-  "lessRegExp":"test"
+  "lessSrc":"static/css/",
+  "lessRegExp":"less$"
 }

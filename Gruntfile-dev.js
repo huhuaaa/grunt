@@ -179,18 +179,21 @@ module.exports = function(grunt) {
     },
     //读取需要编译的less文件
     readdirLess:function(dir){
-      var array = this.fs.readdirSync(dir);
-        for(var i in array){
-          var path = dir.match(/\/$/) ? (dir + array[i]) : (dir + '/' + array[i]);
-          var stats = this.fs.statSync(path);
-          if(stats.isFile()){
-            if(path.match(this.lessDir)){
-              this.lessFiles[path.replace(this.rootpathReg, this.destpath).replace('.less', '.css')] = path;
+        //存在文件夹才读取
+        if(this.fs.existsSync(dir)){
+            var array = this.fs.readdirSync(dir);
+            for(var i in array){
+              var path = dir.match(/\/$/) ? (dir + array[i]) : (dir + '/' + array[i]);
+              var stats = this.fs.statSync(path);
+              if(stats.isFile()){
+                if(path.match(this.lessDir)){
+                  this.lessFiles[path.replace(this.rootpathReg, this.destpath).replace('.less', '.css')] = path;
+                }
+              }
+              if(stats.isDirectory()){
+                this.readdirLess(path);
+              }
             }
-          }
-          if(stats.isDirectory()){
-            this.readdirLess(path);
-          }
         }
     },
     //获取需要编译的less文件
@@ -222,32 +225,14 @@ module.exports = function(grunt) {
         separator:'',
         //读取文件时处理
         process:function(src, filepath){
-          var result = src;
-          var module = lib_path.basename(filepath,'.js');
-          if(config.paths && typeof config.paths[module] == 'undefined'){
-            var reg = new RegExp((__dirname + '/' + config.root + config.baseUrl).replace(/\\/g,'/') + '|.js','g'); 
-            module = filepath.replace(reg,'');
-            //console.log(module);
-          }
-          var templates = result.match(/__template__\s*\([^\)]*\)/g);
-          for(var i in templates){
-            if(typeof __templates[i] == 'undefined'){
-              var tplpath = templates[i].replace(/__template__\s*\(\s*[\'\"]?|[\'\"]\)$/g,'');
-              var reg = new RegExp(templates[i].replace(/\(/g,'\\(').replace(/\)/g,'\\)'),'g');
-              tplpath = lib_path.join(__dirname,config.root,tplpath);
-              if(typeof __templates[tplpath] == 'undefined' && lib_fs.existsSync(tplpath)){
-                __templates[tplpath] = lib_fs.readFileSync(tplpath,{encoding:'utf8'});
-              }
-              if(typeof __templates[tplpath] != 'undefined'){
-                var front = templates[i].replace(/\)/g,'');
-                var html = __templates[tplpath].replace(/\'/g,'\\\'');
-                html = html.replace(/[\n\r]/g,'');
-                html = front + ',\'' + html + '\')';
-                result = result.replace(reg,html);
-              }
+            var result = src;
+            var module = lib_path.basename(filepath,'.js');
+            if(config.paths && typeof config.paths[module] == 'undefined'){
+                var reg = new RegExp((__dirname + '/' + config.root + config.baseUrl).replace(/\\/g,'/') + '|.js','g'); 
+                module = filepath.replace(reg,'');
+                //console.log(module);
             }
-          }
-          return result.replace(/define\s*\(\s*\[/g,'define("'+module+'",[');
+            return result.replace(/define\s*\(\s*\[/g,'define("'+module+'",[');
         }
       },
       bar:{
@@ -281,6 +266,49 @@ module.exports = function(grunt) {
       }
     }
   });
+  
+  //解析模版的方法
+  var myParseTemplate = function(result){
+      var template_htmls = [];
+      var templates = result.match(/__template__\s*\([^\)]*\)/g);
+      for(var i in templates){
+        if(typeof __templates[i] == 'undefined'){
+          var tplpath = templates[i].replace(/__template__\s*\(\s*[\'\"]?|[\'\"]\)$/g,'');
+          tplpath = lib_path.join(__dirname,config.root,tplpath);
+          if(typeof __templates[tplpath] == 'undefined' && lib_fs.existsSync(tplpath)){
+            __templates[tplpath] = lib_fs.readFileSync(tplpath,{encoding:'utf8'});
+          }
+          if(typeof __templates[tplpath] != 'undefined'){
+            var front = templates[i].replace(/\)/g,'');
+            var html = __templates[tplpath].replace(/\'/g,'\\\'');
+            html = html.replace(/[\n\r]/g,'');
+            html = front + ',\'' + html + '\')';
+            template_htmls.push(html);
+          }
+        }
+      }
+      if(template_htmls.length > 0){
+          var html = '\n\rrequire([\'template\'], function(){';
+          for(var i in template_htmls){
+              html += template_htmls[i] + ';';
+          }
+          result = html + '});\n\r' + result;
+      }
+      return result;
+  }
+  
+  //注册模版解析任务
+  grunt.registerTask('tpl', function(){
+      for(var i in concatFiles){
+          var filepath = i;
+          if(lib_fs.existsSync(filepath)){
+              console.log('File ' + filepath);
+              var src = lib_fs.readFileSync(filepath, {encoding: 'utf8'});
+              src = myParseTemplate(src, filepath); //解析需要的模版
+              lib_fs.writeFileSync(filepath, src);
+          }
+      }
+  });
 
   //加载包含 “concat” 任务的插件
   grunt.loadNpmTasks('grunt-contrib-concat');
@@ -292,6 +320,6 @@ module.exports = function(grunt) {
   grunt.loadNpmTasks('grunt-contrib-less');
 
   //执行任务
-  grunt.registerTask('default', ['concat','uglify','less']);
+  grunt.registerTask('default', ['concat','tpl','uglify','less']);
 
 };
