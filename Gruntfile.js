@@ -186,7 +186,7 @@ module.exports = function(grunt) {
               var path = dir.match(/\/$/) ? (dir + array[i]) : (dir + '/' + array[i]);
               var stats = this.fs.statSync(path);
               if(stats.isFile()){
-                if(path.match(this.lessDir)){
+                if(path.match(this.lessRegExp)){
                   this.lessFiles[path.replace(this.rootpathReg, this.destpath).replace('.less', '.css')] = path;
                 }
               }
