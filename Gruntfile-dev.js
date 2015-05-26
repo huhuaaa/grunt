@@ -102,7 +102,9 @@ module.exports = function(grunt) {
             var modules = matchs[j].replace(/require\s*\(\s*\[|[\'\"\s\]]/g,'').split(',');
             this.analyzeConcat(filepath,modules);
         }
-        this.concatFiles[filepath].push(this.rootpath + i);
+        if(typeof this.concatFiles[filepath] != 'undefined'){
+          this.concatFiles[filepath].push(this.rootpath + i);
+        }
         //this.analyzeConcat(filepath,[this.rootpath + i]);
         //this.fs.writeFileSync(filepath, this.files[i], {encoding:'utf8'});
         //异步没写文件
