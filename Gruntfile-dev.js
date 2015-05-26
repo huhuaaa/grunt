@@ -42,8 +42,8 @@ module.exports = function(grunt) {
     var dir = (__dirname + '/').replace(/\\/g,'/'); //统一路径的\\为/
     this.rootpath = dir + (config.root || '');
     this.needDir = this.rootpath + (config.src || '');
-    this.regExp = new RegExp(config.needRegExp || '');
-    this.voidRegExp = config.voidRegExp ? new RegExp(config.voidRegExp) : null;
+    this.regExp = new RegExp(config.needRegExp || '', 'g');
+    this.voidRegExp = config.voidRegExp ? new RegExp(config.voidRegExp, 'g') : null;
     this.files = {}; //需要处理的js
     this.defined = {}; //已经加载的模块
     this.destpath = dir + config.dest; //构建的目标目录
@@ -104,6 +104,8 @@ module.exports = function(grunt) {
         }
         if(typeof this.concatFiles[filepath] != 'undefined'){
           this.concatFiles[filepath].push(this.rootpath + i);
+        }else{
+          this.concatFiles[filepath] = [this.rootpath + i];
         }
         //this.analyzeConcat(filepath,[this.rootpath + i]);
         //this.fs.writeFileSync(filepath, this.files[i], {encoding:'utf8'});
@@ -116,7 +118,9 @@ module.exports = function(grunt) {
     },
     analyzeConcat:function(filepath,modules){
       if(filepath == '') return;
-      if(typeof this.concatFiles[filepath] == 'undefined') this.concatFiles[filepath] = [];
+      if(typeof this.concatFiles[filepath] == 'undefined'){
+        this.concatFiles[filepath] = [];
+      }
       for(var i in modules){
         var path = '';
         if(typeof this.paths[modules[i]] != 'undefined'){
@@ -132,11 +136,14 @@ module.exports = function(grunt) {
           path += '/index.js';
         }
         if(this.fs.existsSync(path) && !array_search(this.concatFiles[filepath],path)){
-          this.concatFiles[filepath].push(path);
-          //查找文件内部是否还有依赖
-          var getInner = this.staticFile(path);
-          if(getInner.length > 0){
-            this.analyzeConcat(filepath,getInner);
+          var stats = this.fs.statSync(path);
+          if(stats.isFile()){
+            this.concatFiles[filepath].push(path);
+            //查找文件内部是否还有依赖
+            var getInner = this.staticFile(path);
+            if(getInner.length > 0){
+              this.analyzeConcat(filepath,getInner);
+            }
           }
         }
       }
