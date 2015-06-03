@@ -68,6 +68,13 @@ module.exports = function(grunt) {
           var path = dir.match(/\/$/) ? (dir + array[i]) : (dir + '/' + array[i]);
           var stats = this.fs.statSync(path);
           if(stats.isFile()){
+            var read = this.fs.readFileSync(path,{encoding:'base64'});
+            var destfile = this.destpath + path.replace(this.rootpath, '');
+            var destdir = this.path.dirname(destfile);
+            if(!this.fs.existsSync(destdir)){
+              this.mkdir(destdir, 0777);
+            }
+            this.fs.writeFileSync(destfile, read, {encoding:'base64'});
             if(path.match(this.regExp) && (!this.voidRegExp || !path.match(this.voidRegExp))){
               var key = path.replace(this.rootpathReg,'');
               //fs.readFileSync 添加第二参数并且指定格式返回字符串，否则返回buffer
@@ -251,7 +258,7 @@ module.exports = function(grunt) {
     //文件压缩配置
     uglify: {
       options: {
-        banner: '/*! <%= grunt.template.today("yyyy-mm-dd") %> */\n'
+        //banner: '/*! <%= grunt.template.today("yyyy-mm-dd") %> */\n'
       },
       build: {
         //多文件方式
